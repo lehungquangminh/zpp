@@ -32,7 +32,7 @@ class Box(Static):
         self.update("[b]" + self.title + "[/b]\n" + "\n".join(lines))
 
 
-class ZPPApp(App):
+class ZPPApp(App[None]):
     CSS = ""
 
     def __init__(self, source: Path) -> None:

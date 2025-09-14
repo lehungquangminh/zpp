@@ -64,7 +64,7 @@ def measure_process(pid: int, start_time: float) -> RunMetrics:
         cpu_times = proc.cpu_times()
         cpu_time = float(cpu_times.user + cpu_times.system)
     except Exception:
-        cpu_time = None  # type: ignore[assignment]
+        cpu_time = None
     end = time.perf_counter()
     wall = end - start_time
     return RunMetrics(

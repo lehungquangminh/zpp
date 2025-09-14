@@ -7,18 +7,20 @@ import subprocess
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from .metrics import RunMetrics
 
 
 def safe_run(cmd: Sequence[str], timeout_s: float) -> tuple[int, str, str]:
     p: subprocess.Popen[str] | None = None
-    kwargs = dict(text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    kwargs: dict[str, Any] = dict(text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         if platform.system() == "Windows":
             p = subprocess.Popen(cmd, **kwargs)
         else:
             p = subprocess.Popen(cmd, preexec_fn=os.setsid, **kwargs)
+        assert p is not None
         out, err = p.communicate(timeout=timeout_s)
         return p.returncode, out, err
     except subprocess.TimeoutExpired:
