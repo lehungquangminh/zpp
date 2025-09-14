@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Optional
 
 import psutil
 
@@ -16,7 +13,7 @@ class CompileMetrics:
     success: bool
     return_code: int
     wall_time_s: float
-    binary_size_bytes: Optional[int]
+    binary_size_bytes: int | None
     compiler: str
     flags: str
     stdout: str
@@ -27,13 +24,13 @@ class CompileMetrics:
 class RunMetrics:
     success: bool
     return_code: int
-    wall_time_s: Optional[float]
-    cpu_time_s: Optional[float]
-    peak_rss_bytes: Optional[int]
+    wall_time_s: float | None
+    cpu_time_s: float | None
+    peak_rss_bytes: int | None
     stdout: str
     stderr: str
 
-    def as_human(self) -> Dict[str, str]:
+    def as_human(self) -> dict[str, str]:
         return {
             "wall": human_seconds(self.wall_time_s),
             "cpu": human_seconds(self.cpu_time_s),

@@ -2,22 +2,18 @@ from __future__ import annotations
 
 import os
 import shlex
-import shutil
 import subprocess
-import sys
 import time
-from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 from .metrics import CompileMetrics
-from .utils import OSInfo, detect_os, getenv_bool, get_logger, which
-
+from .utils import OSInfo, detect_os, get_logger, getenv_bool, which
 
 LOGGER = get_logger("toolchain")
 
 
-def find_compiler() -> Optional[str]:
+def find_compiler() -> str | None:
     for c in ("g++", "clang++"):
         p = which(c)
         if p:
@@ -29,9 +25,9 @@ def default_flags(
     release: bool = False,
     debug: bool = False,
     native: bool = False,
-    extra_flags: Optional[str] = None,
-) -> List[str]:
-    flags: List[str] = ["-std=c++17", "-O2", "-pipe", "-Wall", "-Wextra"]
+    extra_flags: str | None = None,
+) -> list[str]:
+    flags: list[str] = ["-std=c++17", "-O2", "-pipe", "-Wall", "-Wextra"]
     if debug:
         flags = ["-std=c++17", "-g", "-O0", "-Wall", "-Wextra"]
     if release:
@@ -52,15 +48,15 @@ def output_binary_name(source_file: Path) -> Path:
 def compile_source(
     compiler: str,
     source_file: Path,
-    output: Optional[Path] = None,
-    flags: Optional[Sequence[str]] = None,
+    output: Path | None = None,
+    flags: Sequence[str] | None = None,
     timeout_s: float = 60.0,
 ) -> CompileMetrics:
     out_path = output or output_binary_name(source_file)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     argv = [compiler, str(source_file), "-o", str(out_path)] + list(flags or default_flags())
     t0 = time.perf_counter()
-    p = subprocess.run(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout_s)
+    p = subprocess.run(argv, text=True, capture_output=True, timeout=timeout_s)
     t1 = time.perf_counter()
     size = out_path.stat().st_size if out_path.exists() and p.returncode == 0 else None
     return CompileMetrics(
@@ -75,9 +71,9 @@ def compile_source(
     )
 
 
-def doctor() -> Tuple[bool, List[str]]:
+def doctor() -> tuple[bool, list[str]]:
     ok = True
-    messages: List[str] = []
+    messages: list[str] = []
     comp = find_compiler()
     if not comp:
         ok = False
@@ -93,11 +89,11 @@ def doctor() -> Tuple[bool, List[str]]:
     return ok, messages
 
 
-def install_commands_for_os(info: OSInfo) -> List[str]:
+def install_commands_for_os(info: OSInfo) -> list[str]:
     system = info.system
     distro_like = (info.distro_like or "").lower()
     distro_id = (info.distro_id or "").lower()
-    cmds: List[str] = []
+    cmds: list[str] = []
     if system == "Linux":
         if "debian" in distro_like or distro_id in {"debian", "ubuntu", "linuxmint"}:
             cmds = [
@@ -123,10 +119,10 @@ def install_commands_for_os(info: OSInfo) -> List[str]:
     return cmds
 
 
-def install_gpp(dry_run: bool = False, yes: bool = False) -> Tuple[bool, List[str]]:
+def install_gpp(dry_run: bool = False, yes: bool = False) -> tuple[bool, list[str]]:
     info = detect_os()
     cmds = install_commands_for_os(info)
-    notes: List[str] = [f"Detected OS: {info.system} ({info.distro_id or '?'} | like {info.distro_like or '?'})"]
+    notes: list[str] = [f"Detected OS: {info.system} ({info.distro_id or '?'} | like {info.distro_like or '?'})"]
     if dry_run or not yes:
         notes.append("Dry run or --yes not specified. Will not execute.")
         notes += [f"Run: {c}" for c in cmds]

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 from rich.syntax import Syntax
 from textual.app import App, ComposeResult
@@ -12,7 +10,7 @@ from textual.reactive import reactive
 from textual.widgets import Footer, Header, Static
 
 from .hints_ai import ai_enabled, get_ai_hints
-from .hints_rule import Hint, generate_hints
+from .hints_rule import generate_hints
 from .metrics import CompileMetrics, RunMetrics
 from .toolchain import compile_source, find_compiler, output_binary_name
 
@@ -30,7 +28,7 @@ class Box(Static):
         super().__init__(f"[b]{title}[/b]\n")
         self.title = title
 
-    def update_lines(self, lines: List[str]) -> None:
+    def update_lines(self, lines: list[str]) -> None:
         self.update("[b]" + self.title + "[/b]\n" + "\n".join(lines))
 
 
@@ -86,7 +84,7 @@ class ZPPApp(App):
         else:
             self.box_run.update_lines(["Run skipped (build failed)"])
 
-        hints: List[str] = []
+        hints: list[str] = []
         rule_hints = await asyncio.to_thread(generate_hints, self.source)
         for h in rule_hints[:5]:
             hints.append(f"- {h.title}")

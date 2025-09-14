@@ -4,16 +4,15 @@ import os
 import platform
 import signal
 import subprocess
-import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 from .metrics import RunMetrics
 
 
-def safe_run(cmd: Sequence[str], timeout_s: float) -> Tuple[int, str, str]:
-    p: Optional[subprocess.Popen[str]] = None
+def safe_run(cmd: Sequence[str], timeout_s: float) -> tuple[int, str, str]:
+    p: subprocess.Popen[str] | None = None
     kwargs = dict(text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         if platform.system() == "Windows":
@@ -43,7 +42,7 @@ def safe_run(cmd: Sequence[str], timeout_s: float) -> Tuple[int, str, str]:
         return 1, "", str(e)
 
 
-def run_binary(binary_path: Path, args: Optional[List[str]] = None, timeout_s: float = 10.0) -> RunMetrics:
+def run_binary(binary_path: Path, args: list[str] | None = None, timeout_s: float = 10.0) -> RunMetrics:
     argv = [str(binary_path)] + (args or [])
     t0 = time.perf_counter()
     code, out, err = safe_run(argv, timeout_s=timeout_s)

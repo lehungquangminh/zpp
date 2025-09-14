@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 import platform
@@ -9,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:  # Python 3.11+
     import tomllib as toml_reader  # type: ignore[assignment]
@@ -17,7 +16,6 @@ except Exception:  # pragma: no cover
     import tomli as toml_reader  # type: ignore[no-redef]
 
 import tomli_w
-
 
 ZPP_HOME = Path(os.environ.get("ZPP_HOME", Path.home() / ".zpp")).expanduser()
 ZPP_CONFIG = ZPP_HOME / "config.toml"
@@ -62,18 +60,18 @@ def is_windows() -> bool:
 @dataclass
 class OSInfo:
     system: str
-    distro_like: Optional[str]
-    distro_id: Optional[str]
+    distro_like: str | None
+    distro_id: str | None
 
 
 def detect_os() -> OSInfo:
     system = platform.system()
-    distro_like: Optional[str] = None
-    distro_id: Optional[str] = None
+    distro_like: str | None = None
+    distro_id: str | None = None
     if system == "Linux":
         try:
-            data: Dict[str, str] = {}
-            with open("/etc/os-release", "r", encoding="utf-8") as f:
+            data: dict[str, str] = {}
+            with open("/etc/os-release", encoding="utf-8") as f:
                 for line in f:
                     if "=" in line:
                         k, v = line.strip().split("=", 1)
@@ -85,11 +83,11 @@ def detect_os() -> OSInfo:
     return OSInfo(system=system, distro_like=distro_like, distro_id=distro_id)
 
 
-def which(program: str) -> Optional[str]:
+def which(program: str) -> str | None:
     return shutil.which(program)
 
 
-def human_bytes(num: Optional[int]) -> str:
+def human_bytes(num: int | None) -> str:
     if num is None:
         return "N/A"
     step = 1024.0
@@ -100,7 +98,7 @@ def human_bytes(num: Optional[int]) -> str:
     return f"{num} PB"
 
 
-def human_seconds(sec: Optional[float]) -> str:
+def human_seconds(sec: float | None) -> str:
     if sec is None:
         return "N/A"
     if sec < 1e-3:
@@ -121,7 +119,7 @@ def write_text_atomic(path: Path, content: str) -> None:
     os.replace(tmp, path)
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     ensure_dirs()
     if not ZPP_CONFIG.exists():
         return {}
@@ -129,7 +127,7 @@ def load_config() -> Dict[str, Any]:
         return toml_reader.load(f)  # type: ignore[return-value]
 
 
-def save_config(cfg: Dict[str, Any]) -> None:
+def save_config(cfg: dict[str, Any]) -> None:
     ensure_dirs()
     with open(ZPP_CONFIG, "wb") as f:
         tomli_w.dump(cfg, f)

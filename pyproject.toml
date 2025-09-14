@@ -51,9 +51,7 @@ dev = [
 zpp = "zpp.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = [
-  { include = "zpp", from = "src" },
-]
+packages = ["src/zpp"]
 
 [tool.mypy]
 python_version = "3.10"

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import sys
-from pathlib import Path
 import shutil
 import subprocess
-from typing import List, Optional
+import sys
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -15,7 +13,7 @@ from rich.table import Table
 
 from . import __version__
 from .hints_ai import ai_enabled, get_ai_hints
-from .hints_rule import Hint, generate_hints
+from .hints_rule import generate_hints
 from .runner import run_binary
 from .toolchain import (
     compile_source,
@@ -25,8 +23,7 @@ from .toolchain import (
     install_gpp,
     output_binary_name,
 )
-from .utils import getenv_bool, get_logger, load_config, save_config
-
+from .utils import get_logger, getenv_bool, load_config, save_config
 
 app = typer.Typer(add_completion=False, invoke_without_command=True, help="ZPP: C++ build/run + metrics + hints")
 console = Console()
@@ -44,27 +41,13 @@ def version() -> None:
     console.print(f"zpp {__version__}")
 
 
-@app.callback(invoke_without_command=True)
-def root(
-    ctx: typer.Context,
-    file: Optional[str] = typer.Argument(None, help="C++ source file"),
-    args: Optional[str] = typer.Option(None, help="Arguments to pass to program"),
-    release: bool = typer.Option(False, help="Release flags"),
-    debug: bool = typer.Option(False, help="Debug flags"),
-    flags: Optional[str] = typer.Option(None, help="Extra compiler flags"),
-    timeout: float = typer.Option(10.0, help="Run timeout seconds"),
-) -> None:
-    if ctx.invoked_subcommand is not None:
-        return
-    if file is None:
-        console.print("[yellow]Usage: zpp <file.cpp>[/yellow]")
-        raise typer.Exit(code=1)
+def _quick_run(file: str, args: str | None, release: bool, debug: bool, flags: str | None, timeout: float) -> int:
     path = Path(file)
     _require_file(path)
     comp = find_compiler()
     if not comp:
         console.print("[red]No compiler found[/red]. Try: zpp install-gpp")
-        raise typer.Exit(code=3)
+        return 3
     fl = default_flags(release=release, debug=debug, native=not getenv_bool("ZPP_SAFE_MODE", False), extra_flags=flags)
     cm = compile_source(comp, path, flags=fl)
     table = Table(title="Compile")
@@ -77,7 +60,7 @@ def root(
     table.add_row("exit", str(cm.return_code))
     console.print(table)
     if not cm.success:
-        raise typer.Exit(code=4)
+        return 4
     bin_path = output_binary_name(path)
     rm = run_binary(bin_path, args=args.split() if args else None, timeout_s=timeout)
     table2 = Table(title="Run")
@@ -88,8 +71,31 @@ def root(
     table2.add_row("rss", str(rm.peak_rss_bytes or "N/A"))
     table2.add_row("exit", str(rm.return_code))
     console.print(table2)
-    if rm.return_code != 0:
-        raise typer.Exit(code=5)
+    return 0 if rm.return_code == 0 else 5
+
+
+@app.command("quick")
+def quick(
+    file: str = typer.Argument(..., help="C++ source file"),
+    args: str | None = typer.Option(None, help="Arguments to pass to program"),
+    release: bool = typer.Option(False, help="Release flags"),
+    debug: bool = typer.Option(False, help="Debug flags"),
+    flags: str | None = typer.Option(None, help="Extra compiler flags"),
+    timeout: float = typer.Option(10.0, help="Run timeout seconds"),
+) -> None:
+    code = _quick_run(file, args, release, debug, flags, timeout)
+    raise typer.Exit(code=code)
+
+
+@app.callback(invoke_without_command=True)
+def root(ctx: typer.Context, file: str | None = None) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
+    if file is None:
+        console.print("[yellow]Usage: zpp <file.cpp>[/yellow]")
+        raise typer.Exit(code=0)
+    code = _quick_run(file, None, False, False, None, 10.0)
+    raise typer.Exit(code=code)
 
 
 @app.command()
@@ -97,7 +103,7 @@ def build(
     file: str = typer.Argument(..., help="C++ source file"),
     release: bool = typer.Option(False, help="Release flags"),
     debug: bool = typer.Option(False, help="Debug flags"),
-    flags: Optional[str] = typer.Option(None, help="Extra compiler flags"),
+    flags: str | None = typer.Option(None, help="Extra compiler flags"),
 ):
     path = Path(file)
     _require_file(path)
@@ -114,7 +120,7 @@ def build(
 @app.command()
 def run(
     target: str = typer.Argument(..., help="Binary or source file"),
-    args: Optional[str] = typer.Option(None, help="Arguments to pass to program"),
+    args: str | None = typer.Option(None, help="Arguments to pass to program"),
     timeout: float = typer.Option(10.0, help="Run timeout seconds"),
 ):
     path = Path(target)
@@ -148,7 +154,7 @@ def bench(
     if not cm.success:
         raise typer.Exit(code=4)
     bin_path = output_binary_name(path)
-    times: List[float] = []
+    times: list[float] = []
     for _ in range(repeat):
         rm = run_binary(bin_path, timeout_s=timeout)
         times.append(rm.wall_time_s or 0.0)
@@ -207,7 +213,7 @@ def ui(file: str = typer.Argument(...)) -> None:
 def doctor_cmd() -> None:
     ok, messages = doctor()
     for m in messages:
-        console.print(('- ' + m))
+        console.print('- ' + m)
     raise typer.Exit(code=0 if ok else 3)
 
 
@@ -215,7 +221,7 @@ def doctor_cmd() -> None:
 def install_gpp_cmd(dry_run: bool = typer.Option(True), yes: bool = typer.Option(False)) -> None:
     ok, notes = install_gpp(dry_run=dry_run, yes=yes)
     for n in notes:
-        console.print(('- ' + n))
+        console.print('- ' + n)
     raise typer.Exit(code=0 if ok else 3)
 
 
@@ -236,10 +242,10 @@ def init(path: str = typer.Argument("main.cpp")) -> None:
 
 @app.command()
 def config(
-    std: Optional[str] = typer.Option(None, help="Default -std flag"),
-    flags: Optional[str] = typer.Option(None, help="Default flags"),
-    ai_provider: Optional[str] = typer.Option(None, help="openai/gemini/groq"),
-    api_key: Optional[str] = typer.Option(None, help="API key to store"),
+    std: str | None = typer.Option(None, help="Default -std flag"),
+    flags: str | None = typer.Option(None, help="Default flags"),
+    ai_provider: str | None = typer.Option(None, help="openai/gemini/groq"),
+    api_key: str | None = typer.Option(None, help="API key to store"),
 ) -> None:
     cfg = load_config()
     if std:
@@ -261,7 +267,7 @@ def selfcheck() -> None:
     hello.write_text("int main(){return 0;}", encoding="utf-8")
     comp = find_compiler()
     ok = True
-    msgs: List[str] = []
+    msgs: list[str] = []
     if not comp:
         ok = False
         msgs.append("No compiler found")
@@ -272,18 +278,18 @@ def selfcheck() -> None:
         ok = ok and cm.success
         msgs.append(f"Compile hello: {'OK' if cm.success else 'FAIL'}")
     for m in msgs:
-        console.print(('- ' + m))
+        console.print('- ' + m)
     raise typer.Exit(code=0 if ok else 3)
 
 
 @app.command(name="self-update")
 def self_update(
-    index_url: Optional[str] = typer.Option(None, help="Custom index URL (e.g., TestPyPI)"),
+    index_url: str | None = typer.Option(None, help="Custom index URL (e.g., TestPyPI)"),
     pre: bool = typer.Option(False, help="Include pre-releases"),
 ) -> None:
     """Upgrade zpp installed via pipx or pip."""
     use_pipx = shutil.which("pipx") is not None
-    extra_args: List[str] = []
+    extra_args: list[str] = []
     if pre:
         extra_args += ["--pre"]
     try:
@@ -307,11 +313,11 @@ def self_update(
         raise typer.Exit(code=1)
 
 
-def run() -> None:  # alias for python -m zpp.cli
+def main() -> None:  # entrypoint for console script and module
     app()
 
 
 if __name__ == "__main__":
-    run()
+    main()
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional
 
 
 @dataclass
@@ -23,7 +22,7 @@ def strip_comments(code: str) -> str:
     return re.sub(CPP_COMMENT_RE, "", code)
 
 
-def detect_large_copy(code: str) -> Optional[Hint]:
+def detect_large_copy(code: str) -> Hint | None:
     # naive: function parameters by value for std::string or large types
     pat = re.compile(r"\b(\w+)\s*\(.*(std::string|std::vector<[^>]+>)\s+(\w+)\s*\)")
     if pat.search(code):
@@ -38,8 +37,8 @@ def detect_large_copy(code: str) -> Optional[Hint]:
     return None
 
 
-def detect_push_back_reserve(code: str) -> Optional[Hint]:
-    if re.search(r"std::vector<[^>]+>\s+\w+\s*;[\s\S]*?for\s*\(.*\)[\s\S]*?\.push_back\(", code):
+def detect_push_back_reserve(code: str) -> Hint | None:
+    if re.search(r"(std::)?vector<[^>]+>\s+\w+\s*;[\s\S]*?for\s*\(.*\)[\s\S]*?\.push_back\(", code):
         return Hint(
             title="Reserve capacity for vectors before push_back in loops",
             why="Reduces reallocations and copies during growth",
@@ -51,7 +50,7 @@ def detect_push_back_reserve(code: str) -> Optional[Hint]:
     return None
 
 
-def detect_io_sync(code: str) -> Optional[Hint]:
+def detect_io_sync(code: str) -> Hint | None:
     if re.search(r"\bcin\b|\bcout\b", code) and not re.search(r"ios::sync_with_stdio\(false\)", code):
         return Hint(
             title="Speed up iostreams",
@@ -64,7 +63,7 @@ def detect_io_sync(code: str) -> Optional[Hint]:
     return None
 
 
-def detect_pow_square_in_loop(code: str) -> Optional[Hint]:
+def detect_pow_square_in_loop(code: str) -> Hint | None:
     if re.search(r"for\s*\(.*\)[\s\S]*?pow\(\s*([a-zA-Z_][\w]*)\s*,\s*2\s*\)", code):
         return Hint(
             title="Replace pow(x,2) with x*x in loops",
@@ -77,7 +76,7 @@ def detect_pow_square_in_loop(code: str) -> Optional[Hint]:
     return None
 
 
-def detect_missing_O_flags(code: str) -> Optional[Hint]:
+def detect_missing_O_flags(code: str) -> Hint | None:
     # cannot know compile flags from code; present generic suggestion
     return Hint(
         title="Enable -O2 and consider LTO/-march=native",
@@ -89,7 +88,7 @@ def detect_missing_O_flags(code: str) -> Optional[Hint]:
     )
 
 
-def detect_nested_loops_n2(code: str) -> Optional[Hint]:
+def detect_nested_loops_n2(code: str) -> Hint | None:
     if re.search(r"for\s*\(.*\)[\s\S]{0,200}?for\s*\(", code):
         if re.search(r"for[\s\S]{0,300}?\bfind\(|std::find\(|linear_search\(", code):
             return Hint(
@@ -103,7 +102,7 @@ def detect_nested_loops_n2(code: str) -> Optional[Hint]:
     return None
 
 
-def detect_sort_unique(code: str) -> Optional[Hint]:
+def detect_sort_unique(code: str) -> Hint | None:
     if re.search(r"sort\(.*\);[\s\S]{0,100}?auto\s+it\s*=\s*unique\(", code):
         return Hint(
             title="Use unordered_set if ordering is not needed",
@@ -116,7 +115,7 @@ def detect_sort_unique(code: str) -> Optional[Hint]:
     return None
 
 
-def detect_loop_init(code: str) -> Optional[Hint]:
+def detect_loop_init(code: str) -> Hint | None:
     if re.search(r"for\s*\(.*\)[\s\S]{0,120}?(std::vector<|std::string\s+\w+\s*=)", code):
         return Hint(
             title="Hoist invariant initializations out of loops",
@@ -129,7 +128,7 @@ def detect_loop_init(code: str) -> Optional[Hint]:
     return None
 
 
-def generate_hints(source_path: Path, max_hints: int = 10) -> List[Hint]:
+def generate_hints(source_path: Path, max_hints: int = 10) -> list[Hint]:
     code = source_path.read_text(encoding="utf-8", errors="ignore")
     code_no_comments = strip_comments(code)
     detectors = [
@@ -142,7 +141,7 @@ def generate_hints(source_path: Path, max_hints: int = 10) -> List[Hint]:
         detect_loop_init,
         detect_missing_O_flags,
     ]
-    hints: List[Hint] = []
+    hints: list[Hint] = []
     for det in detectors:
         try:
             h = det(code_no_comments)

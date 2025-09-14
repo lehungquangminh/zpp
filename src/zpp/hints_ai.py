@@ -5,12 +5,11 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
-from .utils import getenv_bool, get_logger
-
+from .utils import get_logger, getenv_bool
 
 LOGGER = get_logger("hints_ai")
 
@@ -48,7 +47,7 @@ class AISuggestion:
     estimated_speedup_pct: int
 
 
-def _provider_from_env() -> Optional[str]:
+def _provider_from_env() -> str | None:
     if os.environ.get("OPENAI_API_KEY"):
         return "openai"
     if os.environ.get("GOOGLE_API_KEY"):
@@ -72,7 +71,7 @@ def _prompt_for_code(snippet: str) -> str:
     )
 
 
-async def _post_json(url: str, headers: Dict[str, str], payload: Dict[str, Any], timeout_s: float) -> httpx.Response:
+async def _post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeout_s: float) -> httpx.Response:
     async with httpx.AsyncClient(timeout=timeout_s) as client:
         return await client.post(url, headers=headers, json=payload)
 
@@ -82,7 +81,7 @@ def select_hot_spans(code: str, max_lines: int = 300) -> str:
     return "\n".join(lines[:max_lines])
 
 
-async def get_ai_hints(source_path: Path, timeout_s: float = 6.0) -> List[AISuggestion]:
+async def get_ai_hints(source_path: Path, timeout_s: float = 6.0) -> list[AISuggestion]:
     now = time.time()
     if not _BREAKER.allow(now):
         LOGGER.info("AI breaker open; skipping AI hints")
@@ -142,7 +141,7 @@ async def get_ai_hints(source_path: Path, timeout_s: float = 6.0) -> List[AISugg
         else:
             content = data["choices"][0]["message"]["content"]
             obj = json.loads(content)
-        results: List[AISuggestion] = []
+        results: list[AISuggestion] = []
         for s in obj.get("suggestions", []):
             try:
                 results.append(
