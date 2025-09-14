@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "zpp"
+name = "zynpp"
 version = "0.1.6"
 description = "ZPP: Zero-hassle C++ build/run, metrics, and optimization hints with a real-time terminal UI"
 readme = "README.md"
