@@ -1,18 +1,43 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 from pathlib import Path
 
 from rich.syntax import Syntax
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header, Static  # TextLog resolved dynamically
 
 from .hints_ai import ai_enabled, get_ai_hints
 from .hints_rule import generate_hints
 from .metrics import CompileMetrics, RunMetrics
 from .toolchain import compile_source, find_compiler, output_binary_name
+
+
+class OutputPane(Static):
+    def __init__(self) -> None:
+        super().__init__("")
+        self._buffer: list[str] = []
+
+    def clear(self) -> None:
+        self._buffer.clear()
+        self.update("")
+
+    def write_line(self, line: str) -> None:
+        self._buffer.append(line)
+        self.update("\n".join(self._buffer[-1000:]))
+
+    def write(self, data: str) -> None:
+        if data.endswith("\n"):
+            for part in data.splitlines():
+                self.write_line(part)
+        else:
+            self.write_line(data)
+
+_widgets = importlib.import_module("textual.widgets")
+TextLog = getattr(_widgets, "TextLog", Static)
 
 
 class CodeView(Static):
@@ -42,12 +67,15 @@ class ZPPApp(App[None]):
         self.box_compile = Box("Compile")
         self.box_run = Box("Run")
         self.box_hints = Box("Hints")
+        self.output_log = OutputPane()
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
             with Vertical():
                 yield self.code_view
+            with Vertical():
+                yield self.output_log
             with Vertical():
                 yield self.box_compile
                 yield self.box_run
@@ -61,6 +89,7 @@ class ZPPApp(App[None]):
         await self.refresh_metrics()
 
     async def refresh_metrics(self) -> None:
+        self.output_log.clear()
         comp = await asyncio.to_thread(self._compile)
         self.box_compile.update_lines(
             [
@@ -71,8 +100,14 @@ class ZPPApp(App[None]):
                 f"exit: {comp.return_code}",
             ]
         )
+        if comp.stdout:
+            for line in comp.stdout.splitlines():
+                self.output_log.write_line(line)
+        if comp.stderr:
+            for line in comp.stderr.splitlines():
+                self.output_log.write_line(line)
         if comp.success:
-            runm = await asyncio.to_thread(self._run)
+            runm = await asyncio.to_thread(self._run_stream)
             self.box_run.update_lines(
                 [
                     f"wall: {runm.wall_time_s:.3f}s",
@@ -109,8 +144,89 @@ class ZPPApp(App[None]):
 
         return run_binary(bin_path)
 
+    def _run_stream(self) -> RunMetrics:
+        import subprocess
+        import time as _time
+
+        bin_path = output_binary_name(self.source)
+        t0 = _time.perf_counter()
+        try:
+            p = subprocess.Popen([str(bin_path)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        except Exception as e:  # pragma: no cover
+            self.output_log.write_line(f"spawn error: {e}")
+            return RunMetrics(False, 1, 0.0, None, None, "", str(e))
+        out_buf: list[str] = []
+        err_text = ""
+        try:
+            assert p.stdout is not None
+            for line in p.stdout:
+                out_buf.append(line)
+                self.output_log.write(line)
+        except Exception:
+            pass
+        code = p.wait()
+        t1 = _time.perf_counter()
+        return RunMetrics(
+            success=code == 0,
+            return_code=code,
+            wall_time_s=t1 - t0,
+            cpu_time_s=None,
+            peak_rss_bytes=None,
+            stdout="".join(out_buf),
+            stderr=err_text,
+        )
+
 
 def run_ui(source: Path) -> None:
     ZPPApp(source).run()
+
+
+class RunApp(App[None]):
+    def __init__(self, binary: Path, args: list[str] | None = None) -> None:
+        super().__init__()
+        self.binary = binary
+        self.args = args or []
+        self.output_log = OutputPane()
+        self.box_run = Box("Run")
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Horizontal():
+            with Vertical():
+                yield self.output_log
+            with Vertical():
+                yield self.box_run
+        yield Footer()
+
+    async def on_mount(self) -> None:
+        await asyncio.to_thread(self._run_stream)
+
+    def _run_stream(self) -> None:
+        import subprocess
+        import time as _time
+
+        t0 = _time.perf_counter()
+        try:
+            p = subprocess.Popen([str(self.binary)] + self.args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        except Exception as e:
+            self.output_log.write_line(f"spawn error: {e}")
+            self.box_run.update_lines(["exit: 1"])
+            return
+        try:
+            assert p.stdout is not None
+            for line in p.stdout:
+                self.output_log.write(line)
+        except Exception:
+            pass
+        code = p.wait()
+        t1 = _time.perf_counter()
+        self.box_run.update_lines([
+            f"wall: {t1 - t0:.3f}s",
+            f"exit: {code}",
+        ])
+
+
+def run_split_ui(binary: Path, args: list[str] | None = None) -> None:
+    RunApp(binary, args or []).run()
 
 

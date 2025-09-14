@@ -119,6 +119,7 @@ def run(
 	target: str = typer.Argument(..., help="Binary or source file"),
 	args: str | None = typer.Option(None, help="Arguments to pass to program"),
 	timeout: float = typer.Option(10.0, help="Run timeout seconds"),
+	ui: bool = typer.Option(True, help="Show split UI with live output and metrics"),
 ) -> None:
 	path = Path(target)
 	if path.suffix == ".cpp":
@@ -130,6 +131,11 @@ def run(
 		if not cm.success:
 			raise typer.Exit(code=4)
 		path = output_binary_name(path)
+	if ui and sys.stdout.isatty():
+		from .ui_app import run_split_ui
+
+		run_split_ui(path, args.split() if args else None)
+		raise typer.Exit(code=0)
 	rm = run_binary(path, args=args.split() if args else None, timeout_s=timeout)
 	console.print(json.dumps(rm.__dict__, indent=2, default=str))
 	raise typer.Exit(code=0 if rm.return_code == 0 else 5)
@@ -231,7 +237,7 @@ def init(path: str = typer.Argument("main.cpp")) -> None:
 	content = (
 		"#include <bits/stdc++.h>\nusing namespace std;\nint main(){\n"
 		"ios::sync_with_stdio(false); cin.tie(nullptr);\n"
-		"cout<<\"Hello ZPP!\\n\"; return 0; }\n"
+		"cout<<\"Hello ZynPP!\\n\"; return 0; }\n"
 	)
 	p.write_text(content, encoding="utf-8")
 	console.print(f"Created {p}")
