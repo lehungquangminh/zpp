@@ -7,7 +7,7 @@ Fast C++ build/run, metrics, and optimization hints with a real-time terminal UI
 ### Quickstart
 
 ```bash
-pipx install zpp-beta  # or: pip install --user zpp-beta
+pipx install zpp  # or: pip install --user zpp
 zpp init
 zpp main.cpp      # build + run
 zpp ui main.cpp   # open two-pane UI
@@ -39,7 +39,7 @@ zpp ui main.cpp   # open two-pane UI
 
 If installed via pipx:
 ```bash
-pipx upgrade zpp-beta
+pipx upgrade zpp
 ```
 
 Or use the built-in command:

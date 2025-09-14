@@ -3,8 +3,8 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "zpp-beta"
-version = "0.1.4"
+name = "zpp"
+version = "0.1.5"
 description = "ZPP: Zero-hassle C++ build/run, metrics, and optimization hints with a real-time terminal UI"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
