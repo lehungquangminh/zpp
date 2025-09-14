@@ -297,13 +297,13 @@ def self_update(
 		extra_args += ["--pre"]
 	try:
 		if use_pipx:
-			cmd = ["pipx", "upgrade", "zpp"]
+			cmd = ["pipx", "upgrade", "zynpp"]
 			if index_url:
 				pip_args = f"--index-url {index_url} --extra-index-url https://pypi.org/simple"
 				cmd += ["--pip-args", pip_args]
 			code = subprocess.call(cmd)
 		else:
-			cmd = [sys.executable, "-m", "pip", "install", "-U", "zpp"] + extra_args
+			cmd = [sys.executable, "-m", "pip", "install", "-U", "zynpp"] + extra_args
 			if index_url:
 				cmd += ["--index-url", index_url, "--extra-index-url", "https://pypi.org/simple"]
 			code = subprocess.call(cmd)

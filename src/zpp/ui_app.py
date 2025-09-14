@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 from pathlib import Path
 
 from rich.syntax import Syntax
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Static  # TextLog resolved dynamically
+from textual.widgets import Footer, Header, Static
 
 from .hints_ai import ai_enabled, get_ai_hints
 from .hints_rule import generate_hints
@@ -36,8 +35,6 @@ class OutputPane(Static):
         else:
             self.write_line(data)
 
-_widgets = importlib.import_module("textual.widgets")
-TextLog = getattr(_widgets, "TextLog", Static)
 
 
 class CodeView(Static):
