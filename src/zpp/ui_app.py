@@ -80,7 +80,7 @@ class ZPPApp(App[None]):
         yield Footer()
 
     async def on_mount(self) -> None:
-        self.title = f"ZPP UI - {self.source.name}"
+        self.title = f"ZynPP UI - {self.source.name}"
         self.code_view.code = self.source.read_text(encoding="utf-8", errors="ignore")
         self.code_view.path = str(self.source)
         await self.refresh_metrics()
