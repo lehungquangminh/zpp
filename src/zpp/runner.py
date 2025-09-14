@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
 import platform
-import signal
 import subprocess
 import time
 from collections.abc import Sequence
@@ -19,6 +17,8 @@ def safe_run(cmd: Sequence[str], timeout_s: float) -> tuple[int, str, str]:
         if platform.system() == "Windows":
             p = subprocess.Popen(cmd, **kwargs)
         else:
+            import os
+
             p = subprocess.Popen(cmd, preexec_fn=os.setsid, **kwargs)
         assert p is not None
         out, err = p.communicate(timeout=timeout_s)
@@ -34,6 +34,9 @@ def safe_run(cmd: Sequence[str], timeout_s: float) -> tuple[int, str, str]:
                     )
                 else:
                     try:
+                        import os
+                        import signal
+
                         os.killpg(os.getpgid(p.pid), signal.SIGKILL)
                     except Exception:
                         p.kill()
