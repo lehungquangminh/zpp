@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+import os
+import platform
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import List, Optional, Sequence, Tuple
+
+from .metrics import RunMetrics
+
+
+def safe_run(cmd: Sequence[str], timeout_s: float) -> Tuple[int, str, str]:
+    p: Optional[subprocess.Popen[str]] = None
+    kwargs = dict(text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        if platform.system() == "Windows":
+            p = subprocess.Popen(cmd, **kwargs)
+        else:
+            p = subprocess.Popen(cmd, preexec_fn=os.setsid, **kwargs)
+        out, err = p.communicate(timeout=timeout_s)
+        return p.returncode, out, err
+    except subprocess.TimeoutExpired:
+        if p is not None:
+            try:
+                if platform.system() == "Windows":
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                else:
+                    try:
+                        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                    except Exception:
+                        p.kill()
+            except Exception:
+                pass
+        return 124, "", "Timeout"
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def run_binary(binary_path: Path, args: Optional[List[str]] = None, timeout_s: float = 10.0) -> RunMetrics:
+    argv = [str(binary_path)] + (args or [])
+    t0 = time.perf_counter()
+    code, out, err = safe_run(argv, timeout_s=timeout_s)
+    t1 = time.perf_counter()
+    wall = t1 - t0
+    # CPU and RSS not sampled here; caller may use psutil sampling for precision.
+    success = code == 0
+    return RunMetrics(
+        success=success,
+        return_code=code,
+        wall_time_s=wall,
+        cpu_time_s=None,
+        peak_rss_bytes=None,
+        stdout=out,
+        stderr=err,
+    )
+
+
