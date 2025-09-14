@@ -36,7 +36,6 @@ class OutputPane(Static):
             self.write_line(data)
 
 
-
 class CodeView(Static):
     code = reactive("")
     path = reactive("")
@@ -57,9 +56,10 @@ class Box(Static):
 class ZPPApp(App[None]):
     CSS = ""
 
-    def __init__(self, source: Path) -> None:
+    def __init__(self, source: Path, watch: bool = False) -> None:
         super().__init__()
         self.source = source
+        self.watch_enabled = watch
         self.code_view = CodeView()
         self.box_compile = Box("Compile")
         self.box_run = Box("Run")
@@ -84,6 +84,9 @@ class ZPPApp(App[None]):
         self.code_view.code = self.source.read_text(encoding="utf-8", errors="ignore")
         self.code_view.path = str(self.source)
         await self.refresh_metrics()
+        
+        if self.watch_enabled:
+            asyncio.create_task(self._watch_loop())
 
     async def refresh_metrics(self) -> None:
         self.output_log.clear()
@@ -173,16 +176,32 @@ class ZPPApp(App[None]):
             stderr=err_text,
         )
 
+    async def _watch_loop(self) -> None:
+        last_mtime = self.source.stat().st_mtime
+        while True:
+            try:
+                await asyncio.sleep(0.5)
+                if not self.source.exists():
+                    continue
+                current_mtime = self.source.stat().st_mtime
+                if current_mtime > last_mtime:
+                    last_mtime = current_mtime
+                    self.code_view.code = self.source.read_text(encoding="utf-8", errors="ignore")
+                    await self.refresh_metrics()
+            except Exception:
+                continue
 
-def run_ui(source: Path) -> None:
-    ZPPApp(source).run()
+
+def run_ui(source: Path, watch: bool = False) -> None:
+    ZPPApp(source, watch).run()
 
 
 class RunApp(App[None]):
-    def __init__(self, binary: Path, args: list[str] | None = None) -> None:
+    def __init__(self, binary: Path, args: list[str] | None = None, watch: bool = False) -> None:
         super().__init__()
         self.binary = binary
         self.args = args or []
+        self.watch_enabled = watch
         self.output_log = OutputPane()
         self.box_run = Box("Run")
 
@@ -223,7 +242,5 @@ class RunApp(App[None]):
         ])
 
 
-def run_split_ui(binary: Path, args: list[str] | None = None) -> None:
-    RunApp(binary, args or []).run()
-
-
+def run_split_ui(binary: Path, args: list[str] | None = None, watch: bool = False) -> None:
+    RunApp(binary, args or [], watch).run()

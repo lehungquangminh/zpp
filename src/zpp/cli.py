@@ -120,6 +120,7 @@ def run(
 	args: str | None = typer.Option(None, help="Arguments to pass to program"),
 	timeout: float = typer.Option(10.0, help="Run timeout seconds"),
 	ui: bool = typer.Option(True, help="Show split UI with live output and metrics"),
+	watch: bool = typer.Option(False, help="Watch file for changes and auto-rerun"),
 ) -> None:
 	path = Path(target)
 	if path.suffix == ".cpp":
@@ -131,10 +132,31 @@ def run(
 		if not cm.success:
 			raise typer.Exit(code=4)
 		path = output_binary_name(path)
+	if watch:
+		if path.suffix == ".cpp":
+			source_path = Path(target)
+			from .watcher import watch_file
+			
+			def rerun() -> None:
+				console.print(f"[yellow]File changed: {source_path}[/yellow]")
+				comp = find_compiler()
+				if comp:
+					cm = compile_source(comp, source_path)
+					if cm.success:
+						bin_path = output_binary_name(source_path)
+						rm = run_binary(bin_path, args=args.split() if args else None, timeout_s=timeout)
+						console.print(f"[green]Rerun complete (exit {rm.return_code})[/green]")
+			
+			console.print(f"[blue]Watching {source_path} for changes... (Ctrl+C to stop)[/blue]")
+			watch_file(source_path, rerun)
+		else:
+			console.print("[yellow]Watch mode only works with .cpp files[/yellow]")
+		raise typer.Exit(code=0)
+	
 	if ui and sys.stdout.isatty():
 		from .ui_app import run_split_ui
 
-		run_split_ui(path, args.split() if args else None)
+		run_split_ui(path, args.split() if args else None, watch)
 		raise typer.Exit(code=0)
 	rm = run_binary(path, args=args.split() if args else None, timeout_s=timeout)
 	console.print(json.dumps(rm.__dict__, indent=2, default=str))
@@ -204,12 +226,15 @@ def hint(file: str = typer.Argument(...), ai: bool = typer.Option(False, help="E
 
 
 @app.command()
-def ui(file: str = typer.Argument(...)) -> None:
+def ui(
+	file: str = typer.Argument(...),
+	watch: bool = typer.Option(False, help="Watch file for changes and auto-refresh"),
+) -> None:
 	from .ui_app import run_ui
 
 	path = Path(file)
 	_require_file(path)
-	run_ui(path)
+	run_ui(path, watch)
 
 
 @app.command(name="doctor")
