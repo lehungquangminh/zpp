@@ -88,7 +88,7 @@ def quick(
 
 
 @app.callback(invoke_without_command=True)
-def root(ctx: typer.Context, file: str | None = None) -> None:
+def root(ctx: typer.Context, file: str | None = typer.Argument(None)) -> None:
     if ctx.invoked_subcommand is not None:
         return
     if file is None:
