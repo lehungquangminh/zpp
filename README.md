@@ -7,7 +7,7 @@ Fast C++ build/run, metrics, and optimization hints with a real-time terminal UI
 ### Quickstart
 
 ```bash
-pipx install zpp  # or: pip install --user zpp
+pipx install zynpp  # or: pip install --user zynpp
 zpp init
 zpp main.cpp      # build + run
 zpp ui main.cpp   # open two-pane UI
@@ -39,7 +39,7 @@ zpp ui main.cpp   # open two-pane UI
 
 If installed via pipx:
 ```bash
-pipx upgrade zpp
+pipx upgrade zynpp
 ```
 
 Or use the built-in command:
